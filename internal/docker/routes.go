@@ -9,9 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 // Route is one public hostname -> origin service mapping declared by a
@@ -33,7 +32,7 @@ type Discovery struct {
 }
 
 func NewDiscovery(labelPrefix string, log *slog.Logger) (*Discovery, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := client.New(client.FromEnv)
 	if err != nil {
 		return nil, fmt.Errorf("creating docker client: %w", err)
 	}
@@ -46,16 +45,15 @@ func (d *Discovery) Close() error { return d.cli.Close() }
 // their route declarations. Invalid declarations are logged and skipped so a
 // single bad container never blocks the others.
 func (d *Discovery) DesiredRoutes(ctx context.Context) ([]Route, error) {
-	f := filters.NewArgs()
-	f.Add("status", "running")
-	containers, err := d.cli.ContainerList(ctx, container.ListOptions{Filters: f})
+	f := make(client.Filters).Add("status", "running")
+	res, err := d.cli.ContainerList(ctx, client.ContainerListOptions{Filters: f})
 	if err != nil {
 		return nil, fmt.Errorf("listing containers: %w", err)
 	}
 
 	var routes []Route
 	seen := map[string]string{} // hostname+path -> container, for duplicate detection
-	for _, ctr := range containers {
+	for _, ctr := range res.Items {
 		name := containerName(ctr)
 		parsed, err := d.parseLabels(name, ctr.Labels)
 		if err != nil {

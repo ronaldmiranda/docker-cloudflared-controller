@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/moby/moby/api/types/events"
+	"github.com/moby/moby/client"
 )
 
 // Watch emits a signal on the returned channel (coalesced with debounce)
@@ -15,11 +15,9 @@ import (
 func (d *Discovery) Watch(ctx context.Context, debounce time.Duration) <-chan struct{} {
 	out := make(chan struct{}, 1)
 
-	f := filters.NewArgs()
-	f.Add("type", string(events.ContainerEventType))
-	for _, action := range []string{"start", "die", "stop", "kill", "destroy", "pause", "unpause"} {
-		f.Add("event", action)
-	}
+	f := make(client.Filters).
+		Add("type", string(events.ContainerEventType)).
+		Add("event", "start", "die", "stop", "kill", "destroy", "pause", "unpause")
 
 	notify := func() {
 		select {
@@ -32,7 +30,8 @@ func (d *Discovery) Watch(ctx context.Context, debounce time.Duration) <-chan st
 		defer close(out)
 		var timer *time.Timer
 		for ctx.Err() == nil {
-			msgs, errs := d.cli.Events(ctx, events.ListOptions{Filters: f})
+			res := d.cli.Events(ctx, client.EventsListOptions{Filters: f})
+			msgs, errs := res.Messages, res.Err
 		stream:
 			for {
 				select {
