@@ -2,9 +2,13 @@ package docker
 
 import (
 	"log/slog"
+	"net/netip"
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 )
 
 func testDiscovery() *Discovery {
@@ -17,7 +21,7 @@ func TestParseLabelsSingleRoute(t *testing.T) {
 		"cloudflared.hostname": "app.example.com",
 		"cloudflared.port":     "8080",
 		"com.docker.compose":   "ignored",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +40,7 @@ func TestParseLabelsServiceOverride(t *testing.T) {
 	routes, err := d.parseLabels("myapp", map[string]string{
 		"cloudflared.hostname": "app.example.com",
 		"cloudflared.service":  "https://192.168.1.10:8443",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +57,7 @@ func TestParseLabelsSchemeTargetTLS(t *testing.T) {
 		"cloudflared.scheme":      "https",
 		"cloudflared.target":      "internal-host",
 		"cloudflared.notlsverify": "true",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +78,7 @@ func TestParseLabelsMultipleRoutes(t *testing.T) {
 		"cloudflared.1.hostname": "api.example.com",
 		"cloudflared.1.port":     "3000",
 		"cloudflared.1.path":     "/api",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,19 +92,75 @@ func TestParseLabelsMultipleRoutes(t *testing.T) {
 	}
 }
 
+func TestParseLabelsNetworkIP(t *testing.T) {
+	d := testDiscovery()
+	networks := map[string]string{"proxy": "172.20.0.5", "other_default": "172.21.0.3"}
+
+	routes, err := d.parseLabels("myapp", map[string]string{
+		"cloudflared.hostname": "app.example.com",
+		"cloudflared.port":     "8080",
+		"cloudflared.network":  "proxy",
+	}, networks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if routes[0].Service != "http://172.20.0.5:8080" {
+		t.Errorf("service = %q", routes[0].Service)
+	}
+
+	// Network the container is not attached to.
+	if _, err := d.parseLabels("myapp", map[string]string{
+		"cloudflared.hostname": "app.example.com",
+		"cloudflared.port":     "8080",
+		"cloudflared.network":  "missing",
+	}, networks); err == nil {
+		t.Error("expected error for unknown network")
+	}
+
+	// target and network are mutually exclusive.
+	if _, err := d.parseLabels("myapp", map[string]string{
+		"cloudflared.hostname": "app.example.com",
+		"cloudflared.port":     "8080",
+		"cloudflared.target":   "somewhere",
+		"cloudflared.network":  "proxy",
+	}, networks); err == nil {
+		t.Error("expected error for target+network")
+	}
+}
+
 func TestParseLabelsErrors(t *testing.T) {
 	d := testDiscovery()
 
 	if _, err := d.parseLabels("myapp", map[string]string{
 		"cloudflared.port": "8080",
-	}); err == nil {
+	}, nil); err == nil {
 		t.Error("expected error for missing hostname")
 	}
 
 	if _, err := d.parseLabels("myapp", map[string]string{
 		"cloudflared.hostname": "app.example.com",
-	}); err == nil {
+	}, nil); err == nil {
 		t.Error("expected error for missing port and service")
+	}
+}
+
+func TestContainerIPs(t *testing.T) {
+	ctr := container.Summary{
+		NetworkSettings: &container.NetworkSettingsSummary{
+			Networks: map[string]*network.EndpointSettings{
+				"proxy": {IPAddress: netip.MustParseAddr("172.20.0.5")},
+				"v6net": {IPAddress: netip.MustParseAddr("fd00::5")},
+				"none":  {},
+			},
+		},
+	}
+	want := map[string]string{"proxy": "172.20.0.5", "v6net": "[fd00::5]"}
+	if got := containerIPs(ctr); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	if got := containerIPs(container.Summary{}); len(got) != 0 {
+		t.Errorf("expected no IPs, got %+v", got)
 	}
 }
 
@@ -108,7 +168,7 @@ func TestParseLabelsNoMatch(t *testing.T) {
 	d := testDiscovery()
 	routes, err := d.parseLabels("myapp", map[string]string{
 		"traefik.enable": "true",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -55,7 +55,7 @@ func (d *Discovery) DesiredRoutes(ctx context.Context) ([]Route, error) {
 	seen := map[string]string{} // hostname+path -> container, for duplicate detection
 	for _, ctr := range res.Items {
 		name := containerName(ctr)
-		parsed, err := d.parseLabels(name, ctr.Labels)
+		parsed, err := d.parseLabels(name, ctr.Labels, containerIPs(ctr))
 		if err != nil {
 			d.log.Error("ignoring container with invalid labels", "container", name, "error", err)
 			continue
@@ -97,10 +97,11 @@ func (d *Discovery) DesiredRoutes(ctx context.Context) ([]Route, error) {
 //	cloudflared.1.hostname=api.example.com
 //	cloudflared.1.port=3000
 //
-// Optional keys per route: service (full origin URL, overrides scheme/target/
-// port), scheme (default http), target (default container name), path,
+// Optional keys per route: service (full origin URL, overrides everything
+// else), scheme (default http), target (default container name), network
+// (use the container's IP on that docker network instead of its name), path,
 // notlsverify.
-func (d *Discovery) parseLabels(containerName string, labels map[string]string) ([]Route, error) {
+func (d *Discovery) parseLabels(containerName string, labels map[string]string, networks map[string]string) ([]Route, error) {
 	prefix := d.labelPrefix + "."
 	groups := map[string]map[string]string{}
 	for k, v := range labels {
@@ -120,7 +121,7 @@ func (d *Discovery) parseLabels(containerName string, labels map[string]string) 
 
 	var routes []Route
 	for group, kv := range groups {
-		r, err := buildRoute(containerName, kv)
+		r, err := buildRoute(containerName, kv, networks)
 		if err != nil {
 			if group != "" {
 				return nil, fmt.Errorf("route %q: %w", group, err)
@@ -132,7 +133,7 @@ func (d *Discovery) parseLabels(containerName string, labels map[string]string) 
 	return routes, nil
 }
 
-func buildRoute(containerName string, kv map[string]string) (Route, error) {
+func buildRoute(containerName string, kv map[string]string, networks map[string]string) (Route, error) {
 	r := Route{
 		Hostname:      kv["hostname"],
 		Path:          kv["path"],
@@ -157,11 +158,52 @@ func buildRoute(containerName string, kv map[string]string) (Route, error) {
 		scheme = "http"
 	}
 	target := kv["target"]
+	if netName := kv["network"]; netName != "" {
+		if target != "" {
+			return r, fmt.Errorf("hostname %q: label keys %q and %q are mutually exclusive", r.Hostname, "target", "network")
+		}
+		ip := networks[netName]
+		if ip == "" {
+			return r, fmt.Errorf("hostname %q: container has no IP on network %q (connected: %v)",
+				r.Hostname, netName, sortedKeys(networks))
+		}
+		target = ip
+	}
 	if target == "" {
 		target = containerName
 	}
 	r.Service = fmt.Sprintf("%s://%s:%s", scheme, target, port)
 	return r, nil
+}
+
+// containerIPs maps each docker network the container is attached to onto its
+// IP address there.
+func containerIPs(ctr container.Summary) map[string]string {
+	if ctr.NetworkSettings == nil {
+		return nil
+	}
+	ips := make(map[string]string, len(ctr.NetworkSettings.Networks))
+	for name, ep := range ctr.NetworkSettings.Networks {
+		if ep == nil || !ep.IPAddress.IsValid() {
+			continue
+		}
+		addr := ep.IPAddress.Unmap()
+		ip := addr.String()
+		if addr.Is6() {
+			ip = "[" + ip + "]" // keep the origin URL valid
+		}
+		ips[name] = ip
+	}
+	return ips
+}
+
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func containerName(ctr container.Summary) string {

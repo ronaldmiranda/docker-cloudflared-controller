@@ -54,6 +54,7 @@ Quando o container para ou é removido, a rota e o DNS são removidos.
 | `cloudflared.service` | não | URL de origem completa (ex.: `https://10.0.0.5:8443`); substitui scheme/target/port |
 | `cloudflared.scheme` | não | `http` (padrão) ou `https` |
 | `cloudflared.target` | não | Host de origem; padrão é o nome do container |
+| `cloudflared.network` | não | Rede Docker; usa o IP do container nessa rede como origem, em vez do nome |
 | `cloudflared.path` | não | Regex de path para roteamento por caminho |
 | `cloudflared.notlsverify` | não | `true` para pular verificação TLS da origem |
 
@@ -63,6 +64,20 @@ O `cloudflared` alcança a origem pelo nome do container, então **o container
 do cloudflared e os serviços expostos precisam compartilhar uma rede Docker**
 (veja o exemplo). Para expor algo fora dessa rede, use `cloudflared.target`
 ou `cloudflared.service` apontando para um IP/host alcançável.
+
+Quando o container está em **outro compose** e o nome não resolve pelo DNS do
+Docker, use `cloudflared.network` com o nome da rede compartilhada — o
+controller passa a usar o IP do container nessa rede (e o atualiza a cada
+restart do container):
+
+```yaml
+labels:
+  cloudflared.hostname: app.exemplo.com
+  cloudflared.port: "8080"
+  cloudflared.network: proxy
+```
+
+`cloudflared.network` e `cloudflared.target` são mutuamente exclusivas.
 
 ### Múltiplas rotas no mesmo container
 

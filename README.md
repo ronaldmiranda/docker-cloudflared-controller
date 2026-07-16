@@ -57,6 +57,7 @@ cleaned up.
 | `cloudflared.service` | no | Full origin URL (e.g. `https://10.0.0.5:8443`); overrides scheme/target/port |
 | `cloudflared.scheme` | no | `http` (default) or `https` |
 | `cloudflared.target` | no | Origin host; defaults to the container name |
+| `cloudflared.network` | no | Docker network; use the container's IP on that network as origin instead of its name |
 | `cloudflared.path` | no | Path regex for path-based routing |
 | `cloudflared.notlsverify` | no | `true` to skip TLS verification of the origin |
 
@@ -66,6 +67,20 @@ cleaned up.
 container and the exposed services must share a Docker network** (see the
 example). To expose something outside that network, use `cloudflared.target`
 or `cloudflared.service` pointing at a reachable IP/host.
+
+When the container lives in **another compose project** and its name doesn't
+resolve through Docker DNS, set `cloudflared.network` to the shared network's
+name — the controller then uses the container's IP on that network (and
+refreshes it on every container restart):
+
+```yaml
+labels:
+  cloudflared.hostname: app.example.com
+  cloudflared.port: "8080"
+  cloudflared.network: proxy
+```
+
+`cloudflared.network` and `cloudflared.target` are mutually exclusive.
 
 ### Multiple routes on the same container
 
