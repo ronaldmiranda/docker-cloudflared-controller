@@ -1,0 +1,50 @@
+# Example full stack: cloudflared + controller + one exposed application.
+#
+# Prerequisites (one time only, in the Zero Trust dashboard or via cloudflared CLI):
+#   1. Create a remotely-managed tunnel and copy its token (TUNNEL_TOKEN).
+#   2. Create an API token with: Account > Cloudflare Tunnel > Edit
+#      and Zone > DNS > Edit (on the zones you want to use).
+#
+# WARNING: the controller takes ownership of the tunnel configuration — use a
+# tunnel dedicated to this host; routes created manually on it will be removed.
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    restart: unless-stopped
+    networks: [web]
+
+  cloudflared-controller:
+    image: ronaldmiranda/cloudflared-controller:latest
+    build: .
+    environment:
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
+      TUNNEL_ID: ${TUNNEL_ID}
+      # LABEL_PREFIX: cloudflared     # default
+      # RESYNC_INTERVAL: 5m           # default
+      # MANAGE_DNS: "true"            # default
+      # LOG_LEVEL: debug
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # The image runs as a non-root user; add the GID of the group that owns
+    # the socket so it can be read. Find it with: stat -c %g /var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-999}"
+    restart: unless-stopped
+
+  # Example: becomes reachable at https://whoami.example.com without exposing a port
+  whoami:
+    image: traefik/whoami
+    labels:
+      cloudflared.hostname: whoami.rnld.dev
+      cloudflared.port: "80"
+    restart: unless-stopped
+    networks: [web]
+
+networks:
+  web:
+    name: web
