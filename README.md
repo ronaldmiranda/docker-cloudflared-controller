@@ -124,6 +124,8 @@ Summary:
   DOCKER_GID=999 # stat -c %g /var/run/docker.sock
 ```
 
+`docker-compose.yml` example:
+
 ```yaml
 services:
   cloudflared-controller:
