@@ -1,7 +1,7 @@
 # cloudflared-controller
 
 [![Container Build](https://github.com/ronaldmiranda/docker-cloudflared-controller/actions/workflows/container_build.yml/badge.svg)](https://github.com/ronaldmiranda/cloudflared-controller/actions/workflows/container_build.yml)
-[![Docker Hub](https://img.shields.io/docker/v/ronaldmiranda/docker-cloudflared-controller?label=docker%20hub)](https://hub.docker.com/r/ronaldmiranda/cloudflared-controller)
+[![Docker Hub](https://img.shields.io/docker/v/ronaldmiranda/cloudflared-controller?label=docker%20hub)](https://hub.docker.com/r/ronaldmiranda/cloudflared-controller)
 
 *Leia em [português](README.pt-BR.md).*
 
