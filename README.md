@@ -111,21 +111,32 @@ labels:
 
 Images for `linux/amd64` and `linux/arm64` are published to
 [Docker Hub](https://hub.docker.com/r/ronaldmiranda/cloudflared-controller).
-See `docker-compose.example.yml` for the full stack (cloudflared + controller
-+ sample app). Summary:
+See `docker-compose.yml` for the full stack (cloudflared + controller - sample app).
+
+Summary:
+
+`.env` example:
+
+```env
+  CLOUDFLARE_API_TOKEN=...
+  CLOUDFLARE_ACCOUNT_ID=...
+  TUNNEL_ID=...
+  DOCKER_GID=999 # stat -c %g /var/run/docker.sock
+```
 
 ```yaml
-cloudflared-controller:
-  image: ronaldmiranda/cloudflared-controller:latest
-  environment:
-    CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
-    CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
-    TUNNEL_ID: ${TUNNEL_ID}
-  volumes:
-    - /var/run/docker.sock:/var/run/docker.sock:ro
-  group_add:
-    - "${DOCKER_GID:-999}" # docker group GID: stat -c %g /var/run/docker.sock
-  restart: unless-stopped
+services:
+  cloudflared-controller:
+    image: ronaldmiranda/cloudflared-controller:latest
+    environment:
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
+      TUNNEL_ID: ${TUNNEL_ID}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    group_add:
+      - "${DOCKER_GID:-999}" # docker group GID: stat -c %g /var/run/docker.sock
+    restart: unless-stopped
 ```
 
 The image runs as a non-root user, so the container must join the group that
