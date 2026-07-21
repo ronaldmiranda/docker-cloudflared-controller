@@ -1,5 +1,8 @@
 # cloudflared-controller
 
+[![Container Build](https://github.com/ronaldmiranda/docker-cloudflared-controller/actions/workflows/container_build.yml/badge.svg)](https://github.com/ronaldmiranda/docker-cloudflared-controller/actions/workflows/container_build.yml)
+[![Docker Hub](https://img.shields.io/docker/v/ronaldmiranda/cloudflared-controller?label=docker%20hub)](https://hub.docker.com/r/ronaldmiranda/cloudflared-controller)
+
 *Read this in [English](README.md).*
 
 Controller em Go que monitora containers Docker e gerencia automaticamente as
@@ -106,21 +109,37 @@ labels:
 
 ## Rodando
 
-Veja `docker-compose.example.yml` para a stack completa (cloudflared +
-controller + app de exemplo). Resumo:
+Imagens para `linux/amd64` e `linux/arm64` são publicadas no
+[Docker Hub](https://hub.docker.com/r/ronaldmiranda/cloudflared-controller).
+Veja `docker-compose.yml` para a stack completa (cloudflared + controller +
+app de exemplo).
+
+Resumo:
+
+Exemplo de `.env`:
+
+```env
+  CLOUDFLARE_API_TOKEN=...
+  CLOUDFLARE_ACCOUNT_ID=...
+  TUNNEL_ID=...
+  DOCKER_GID=999 # stat -c %g /var/run/docker.sock
+```
+
+Exemplo de `docker-compose.yml`:
 
 ```yaml
-cloudflared-controller:
-  build: .
-  environment:
-    CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
-    CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
-    TUNNEL_ID: ${TUNNEL_ID}
-  volumes:
-    - /var/run/docker.sock:/var/run/docker.sock:ro
-  group_add:
-    - "${DOCKER_GID:-999}" # GID do grupo docker: stat -c %g /var/run/docker.sock
-  restart: unless-stopped
+services:
+  cloudflared-controller:
+    image: ronaldmiranda/cloudflared-controller:latest
+    environment:
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
+      TUNNEL_ID: ${TUNNEL_ID}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    group_add:
+      - "${DOCKER_GID:-999}" # GID do grupo docker: stat -c %g /var/run/docker.sock
+    restart: unless-stopped
 ```
 
 A imagem roda como usuário não-root, então o container precisa entrar no
