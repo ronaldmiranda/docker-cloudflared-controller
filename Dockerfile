@@ -11,4 +11,5 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/cloudflared-controller /cloudflared-controller
 USER nonroot
+EXPOSE 8080
 ENTRYPOINT ["/cloudflared-controller"]

@@ -6,6 +6,7 @@ import (
 	"context"
 	"log/slog"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/ronaldmiranda/cloudflared-controller/internal/cloudflare"
@@ -24,6 +25,9 @@ type Controller struct {
 	// dnsZones accumulates every zone a labeled hostname has resolved to, so
 	// stale-record sweeps keep covering a zone after its last container stops.
 	dnsZones map[string]cloudflare.Zone
+
+	routesMu sync.RWMutex
+	routes   []docker.Route // last routes seen by reconcile, read by the status page
 }
 
 func New(cfg *config.Config, cf *cloudflare.Client, d *docker.Discovery, log *slog.Logger) *Controller {
@@ -75,6 +79,7 @@ func (c *Controller) reconcile(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	c.setRoutes(routes)
 
 	desired := &cloudflare.TunnelConfig{Ingress: make([]cloudflare.IngressRule, 0, len(routes)+1)}
 	for _, r := range routes {
@@ -113,6 +118,20 @@ func (c *Controller) reconcile(ctx context.Context) error {
 
 	c.log.Debug("reconcile done", "took", time.Since(start).Round(time.Millisecond))
 	return nil
+}
+
+func (c *Controller) setRoutes(routes []docker.Route) {
+	c.routesMu.Lock()
+	c.routes = routes
+	c.routesMu.Unlock()
+}
+
+// Routes returns the routes discovered by the most recent reconcile, for the
+// status page. Safe for concurrent use.
+func (c *Controller) Routes() []docker.Route {
+	c.routesMu.RLock()
+	defer c.routesMu.RUnlock()
+	return c.routes
 }
 
 // ingressEqual compares only the fields this controller manages, so unrelated

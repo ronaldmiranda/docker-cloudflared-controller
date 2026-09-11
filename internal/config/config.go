@@ -28,6 +28,9 @@ type Config struct {
 	// ManageDNS controls whether the controller creates/deletes CNAME
 	// records pointing to the tunnel.
 	ManageDNS bool
+
+	// StatusAddr is the listen address for the synced-hostnames status page.
+	StatusAddr string
 }
 
 func Load() (*Config, error) {
@@ -39,6 +42,7 @@ func Load() (*Config, error) {
 		ResyncInterval:   5 * time.Minute,
 		DebounceInterval: 2 * time.Second,
 		ManageDNS:        envOr("MANAGE_DNS", "true") != "false",
+		StatusAddr:       envOr("STATUS_ADDR", ":8080"),
 	}
 
 	if v := os.Getenv("RESYNC_INTERVAL"); v != "" {

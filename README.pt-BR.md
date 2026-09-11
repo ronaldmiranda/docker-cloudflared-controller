@@ -48,6 +48,12 @@ Quando o container para ou é removido, a rota e o DNS são removidos.
 > túnel. Use um túnel dedicado ao host Docker; rotas adicionadas manualmente
 > nesse túnel serão sobrescritas no próximo reconcile.
 
+## Página de status
+
+Uma página HTML simples com os hostnames sincronizados é servida em
+`STATUS_ADDR` (padrão `:8080`) — acesse `http://<host>:8080/` depois de
+publicar a porta (veja `docker-compose.yml`).
+
 ## Labels
 
 | Label | Obrigatória | Descrição |
@@ -104,6 +110,7 @@ labels:
 | `LABEL_PREFIX` | não | `cloudflared` | Namespace das labels |
 | `RESYNC_INTERVAL` | não | `5m` | Intervalo do reconcile periódico |
 | `MANAGE_DNS` | não | `true` | `false` desativa a gestão de CNAMEs |
+| `STATUS_ADDR` | não | `:8080` | Endereço de escuta da página de status |
 | `LOG_LEVEL` | não | `info` | `debug` para logs detalhados |
 | `DOCKER_HOST` | não | socket local | Endereço do daemon Docker |
 
@@ -168,6 +175,7 @@ internal/config/              carga de configuração via env
 internal/docker/              descoberta de rotas por labels + watch de eventos
 internal/cloudflare/          cliente mínimo da API v4 (tunnel config + DNS)
 internal/controller/          loop de reconciliação (ingress + DNS)
+internal/status/              página de status com os hostnames sincronizados
 ```
 
 ### Pipeline de release

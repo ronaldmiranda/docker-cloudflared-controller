@@ -12,6 +12,7 @@ import (
 	"github.com/ronaldmiranda/cloudflared-controller/internal/config"
 	"github.com/ronaldmiranda/cloudflared-controller/internal/controller"
 	"github.com/ronaldmiranda/cloudflared-controller/internal/docker"
+	"github.com/ronaldmiranda/cloudflared-controller/internal/status"
 )
 
 func main() {
@@ -41,8 +42,23 @@ func main() {
 	defer stop()
 
 	ctrl := controller.New(cfg, cf, discovery, log)
-	if err := ctrl.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-		log.Error("controller exited", "error", err)
+	statusSrv := status.New(cfg.StatusAddr, ctrl.Routes, log)
+
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	errCh := make(chan error, 2)
+	go func() { errCh <- ctrl.Run(runCtx); cancel() }()
+	go func() { errCh <- statusSrv.Run(runCtx); cancel() }()
+
+	var runErr error
+	for range 2 {
+		if err := <-errCh; err != nil && !errors.Is(err, context.Canceled) && runErr == nil {
+			runErr = err
+		}
+	}
+	if runErr != nil {
+		log.Error("controller exited", "error", runErr)
 		os.Exit(1)
 	}
 	log.Info("shutdown complete")

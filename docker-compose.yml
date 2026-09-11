@@ -27,9 +27,14 @@ services:
       # LABEL_PREFIX: cloudflared     # default
       # RESYNC_INTERVAL: 5m           # default
       # MANAGE_DNS: "true"            # default
+      # STATUS_ADDR: ":8080"          # default; synced-hostnames status page
       # LOG_LEVEL: debug
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Uncomment to view the status page (http://localhost:8080) from outside
+    # the "web" network.
+    # ports:
+    #   - "8080:8080"
     # The image runs as a non-root user; add the GID of the group that owns
     # the socket so it can be read. Find it with: stat -c %g /var/run/docker.sock
     group_add:

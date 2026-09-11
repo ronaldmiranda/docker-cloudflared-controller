@@ -48,6 +48,12 @@ cleaned up.
 > list. Use a tunnel dedicated to the Docker host; routes added manually to
 > that tunnel will be overwritten on the next reconcile.
 
+## Status page
+
+A minimal HTML page listing the currently synced hostnames is served on
+`STATUS_ADDR` (default `:8080`) — open `http://<host>:8080/` after publishing
+the port (see `docker-compose.yml`).
+
 ## Labels
 
 | Label | Required | Description |
@@ -104,6 +110,7 @@ labels:
 | `LABEL_PREFIX` | no | `cloudflared` | Label namespace |
 | `RESYNC_INTERVAL` | no | `5m` | Periodic reconcile interval |
 | `MANAGE_DNS` | no | `true` | `false` disables CNAME management |
+| `STATUS_ADDR` | no | `:8080` | Listen address for the status page |
 | `LOG_LEVEL` | no | `info` | `debug` for verbose logs |
 | `DOCKER_HOST` | no | local socket | Docker daemon address |
 
@@ -167,6 +174,7 @@ internal/config/              env-based configuration loading
 internal/docker/              label-based route discovery + event watching
 internal/cloudflare/          minimal v4 API client (tunnel config + DNS)
 internal/controller/          reconcile loop (ingress + DNS)
+internal/status/              synced-hostnames status page
 ```
 
 ### Release pipeline
