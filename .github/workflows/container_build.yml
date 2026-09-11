@@ -53,15 +53,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Trivy filesystem scan (deps + Dockerfile misconfig)
+      - name: Trivy filesystem scan (SARIF for Security tab)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
           scanners: vuln,misconfig,secret
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: "1"
           format: sarif
           output: trivy-fs-results.sarif
 
@@ -70,6 +67,19 @@ jobs:
         if: always()
         with:
           sarif_file: trivy-fs-results.sarif
+
+      # SARIF output ignores the severity filter (it always reports every
+      # severity so GitHub can triage), so gate the build with a second,
+      # plain-format run that actually respects severity + ignore-unfixed.
+      - name: Fail on fixable CRITICAL/HIGH findings (deps + Dockerfile misconfig)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
 
   build:
     needs: test
@@ -120,15 +130,12 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - name: Trivy image scan
+      - name: Trivy image scan (SARIF for Security tab)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
           image-ref: ${{ env.IMAGE }}@${{ needs.build.outputs.digest }}
           scanners: vuln
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: "1"
           format: sarif
           output: trivy-image-results.sarif
 
@@ -137,3 +144,16 @@ jobs:
         if: always()
         with:
           sarif_file: trivy-image-results.sarif
+
+      # SARIF output ignores the severity filter (it always reports every
+      # severity so GitHub can triage), so gate the build with a second,
+      # plain-format run that actually respects severity + ignore-unfixed.
+      - name: Fail on fixable CRITICAL/HIGH vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE }}@${{ needs.build.outputs.digest }}
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
