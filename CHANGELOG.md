@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-02
+
 ### Added
 - Status page (`STATUS_ADDR`, default `:8080`) listing the synced hostnames.
 - Trivy filesystem and image scans in CI, reported to the GitHub Security tab.
