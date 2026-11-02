@@ -15,6 +15,9 @@ import (
 	"github.com/ronaldmiranda/cloudflared-controller/internal/status"
 )
 
+// version is set at build time via -ldflags "-X main.version=...".
+var version = "dev"
+
 func main() {
 	level := slog.LevelInfo
 	if os.Getenv("LOG_LEVEL") == "debug" {
@@ -22,6 +25,7 @@ func main() {
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 	slog.SetDefault(log)
+	log.Info("starting cloudflared-controller", "version", version)
 
 	cfg, err := config.Load()
 	if err != nil {
