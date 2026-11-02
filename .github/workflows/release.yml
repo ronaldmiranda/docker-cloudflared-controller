@@ -10,6 +10,9 @@ on:
 permissions:
   contents: read
 
+env:
+  IMAGE: ronaldmiranda/cloudflared-controller
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -47,6 +50,8 @@ jobs:
           (cd dist && sha256sum *.tar.gz > checksums.txt)
 
       - name: Release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Use the matching CHANGELOG.md section when there is one,
           # otherwise fall back to GitHub's generated notes.
@@ -56,14 +61,27 @@ jobs:
             on && /^## \[/ { exit }
             on { print }
           ' CHANGELOG.md > notes.md
-          [ -s notes.md ] || rm notes.md
+          if [ ! -s notes.md ]; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+              -f tag_name="$GITHUB_REF_NAME" --jq .body > notes.md
+          fi
+          # Tell users which image matches this release (pushed by container_build.yml).
+          cat >> notes.md <<EOF
+
+          ## Docker image
+
+          \`\`\`sh
+          docker pull ${IMAGE}:${v}
+          \`\`\`
+
+          Use \`image: ${IMAGE}:${v}\` in your compose file.
+          EOF
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          args=(--verify-tag --title "$GITHUB_REF_NAME")
-          if [ -f notes.md ]; then args+=(--notes-file notes.md); else args+=(--generate-notes); fi
+          args=(--verify-tag --title "$GITHUB_REF_NAME" --notes-file notes.md)
           # Tags like v1.2.3-rc.1 are published as pre-releases.
           case "$GITHUB_REF_NAME" in *-*) args+=(--prerelease) ;; esac
           gh release create "$GITHUB_REF_NAME" "${args[@]}" dist/*.tar.gz dist/checksums.txt
