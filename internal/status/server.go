@@ -33,7 +33,7 @@ func New(addr string, routes func() []docker.Route, log *slog.Logger) *Server {
 			log.Error("rendering status page", "error", err)
 		}
 	})
-	return &Server{http: &http.Server{Addr: addr, Handler: mux}, log: log}
+	return &Server{http: &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}, log: log}
 }
 
 // Run blocks, serving until ctx is cancelled, then shuts down gracefully.
